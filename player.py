@@ -8,7 +8,7 @@ Created on Thu May  6 21:40:34 2021
 from math import sqrt
 
 class Player():
-  name = "BFS"
+  name = "Greedy"
   group = "White-collar worker"
   members = [
     ["Woo Wai Hong", "16026189"],
@@ -16,8 +16,7 @@ class Player():
     ["Matthew Ng Yee Chun", "18031930"],
     ["Phang Chin Ter", "17035643"]
   ]
-  informed = False
-  
+  informed = True
   
   def __init__(self, setup):
     # setup = {
@@ -25,6 +24,13 @@ class Player():
     #   static_snake_length: bool
     # }
     self.setup = setup
+    
+  # Heuristic function of the algorithm  
+  def distanceToFood(self, coord, food_locations):
+    dist = []
+    for food in food_locations:
+      dist.append(sqrt((coord[0]-food[0])**2 + (coord[1]-food[1])**2))
+    return min(dist)
 
   def distanceFromParent(self, search_tree, currentNode):
     parent = currentNode["parent"]
@@ -57,7 +63,7 @@ class Player():
     directionsMap = {'w':[-1,0],'e':[1,0],'n':[0,-1], 's':[0,1]}
     
     # Add the initial node to both frontier and search tree
-    frontier.append({'state': problem['snake_locations'][0],'action': []})
+    frontier.append({'state': problem['snake_locations'][0],'action': [], 'dist': None})
     
     search_tree.append({
       'id': (len(search_tree)+1),
@@ -66,7 +72,8 @@ class Player():
       'children': [],      
       'actions': [],
       'removed': False,
-      'parent': None
+      'parent': None,
+      'dist': self.distanceToFood(problem['snake_locations'][0], problem['food_locations'])
       })
     
     while not found_goal:
@@ -91,30 +98,23 @@ class Player():
           for direction in directions:
             d = directionsMap.get(direction)
             coord = [x + d[0], y + d[1]]
-            
-            # Check if the coord is valid
+              
             if -1 not in coord:
-              # Check if the coord is within the maze
               if coord[0] < self.setup['maze_size'][0] and coord[1] < self.setup['maze_size'][1]:
-                # Check if the coord is not the snake's body
-                # Check for the snake tail movement for possible paths
                 if coord not in problem['snake_locations'][0:len(problem["snake_locations"])-self.distanceFromParent(search_tree, s)]:
-                  actions.append(direction)
-                   
-                  # Check duplicate
+
+                  # Check duplicate 
                   removed = False
                   for f in frontier:
                     if f['state'] == coord:
                       removed = True
                   if coord in explored:
                     removed = True
-                  
-                  # Add the node to the frontier if it is not duplicate node
-                  if not removed:
-                    frontier.append({'state': coord, 'action': direction})        
-                  
+                    
                   # Add children
                   childrenId = len(search_tree) + 1
+                  children.append(childrenId)
+                    
                   search_tree.append({
                     "id": childrenId,
                     "state": coord,
@@ -124,7 +124,13 @@ class Player():
                     "removed": removed,
                     "parent": s['id']
                     })
-                  children.append(childrenId)                       
+                  
+                  actions.append(direction)
+                  if not removed:
+                    frontier.append({'state': coord, 'action': direction, 'dist': self.distanceToFood(coord, problem['food_locations'])})
+                  
+          # Sort based on distance; nearest to furthest       
+          frontier.sort(key=lambda c:c['dist'])
           
           # Update parent node
           parent = search_tree.pop(i)
@@ -139,14 +145,13 @@ class Player():
             })
           search_tree.insert(i , new_parent)
           
-          # Force the snake to terminate when there is no more nodes left to expand
+          # No actions
           if (len(frontier) == 0):
             found_goal = True
             parent = s["parent"]
             break
               
-    
-    # Generate solution based on the explored list
+    # Generate solution based on explored list
     solution = []
     currentLocation = explored[-1]
     
@@ -166,14 +171,14 @@ class Player():
               break
             
           solution.insert(0, currentAction)  
-        
+            
     # When there is no other possible solution, force move the snake    
     if len(solution) == 0:
       if (problem['current_direction'] == 'n'):
         solution = ['e']
       else:
         solution = ['n']
-        
+    
     return solution, search_tree  
 
 if __name__ == "__main__":
